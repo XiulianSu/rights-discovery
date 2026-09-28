@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# 上传前先问四件事：传哪个文件、传到哪个仓库、用什么认证、推到哪个分支。
+# 用法: gp-safe <github-repo-url> <file-or-folder>
+set -u
+
+if [[ $# -ne 2 ]]; then
+  echo "用法: gp-safe <github-repo-url> <file-or-folder>"
+  exit 2
+fi
+
+REPO_INPUT="$1"
+TARGET="$2"
+
+if [[ ! -e "$TARGET" ]]; then
+  echo "❌ 找不到要上传的路径：$TARGET"
+  exit 1
+fi
+
+if [[ -d "$TARGET" ]]; then
+  START="$TARGET"
+else
+  START="$(cd "$(dirname "$TARGET")" && pwd)"
+fi
+
+if ! git -C "$START" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "❌ 当前目录不是 git 仓库，需要指定仓库地址"
+  echo "传哪个路径：$TARGET"
+  echo "未执行 git init。"
+  exit 1
+fi
+
+ROOT="$(git -C "$START" rev-parse --show-toplevel)"
+BRANCH="$(git -C "$ROOT" symbolic-ref --short HEAD 2>/dev/null || true)"
+if [[ -z "$BRANCH" ]]; then
+  echo "❌ 当前不在任何分支上，先确认要推的分支。"
+  exit 1
+fi
+
+normalize_ssh() {
+  local url="${1%.git}"
+  local owner repo
+  if [[ "$url" =~ ^https://github.com/([^/]+)/([^/]+)$ ]]; then
+    owner="${BASH_REMATCH[1]}"
+    repo="${BASH_REMATCH[2]}"
+  elif [[ "$url" =~ ^git@github.com:([^/]+)/([^/]+)$ ]]; then
+    owner="${BASH_REMATCH[1]}"
+    repo="${BASH_REMATCH[2]}"
+  elif [[ "$url" =~ ^ssh://git@github.com/([^/]+)/([^/]+)$ ]]; then
+    owner="${BASH_REMATCH[1]}"
+    repo="${BASH_REMATCH[2]}"
+  else
+    return 1
+  fi
+  printf 'ssh://git@github.com/%s/%s.git\n' "$owner" "$repo"
+}
+
+if ! SSH_URL="$(normalize_ssh "$REPO_INPUT")"; then
+  echo "❌ 仓库地址不是 GitHub 地址：$REPO_INPUT"
+  exit 1
+fi
+
+echo "传哪个路径：$TARGET"
+echo "仓库根目录：$ROOT"
+echo "传到哪个仓库：$SSH_URL"
+echo "当前分支：$BRANCH"
+
+if [[ "$REPO_INPUT" == https://* ]]; then
+  echo "认证方式：传入的是 HTTPS。改为 SSH：$SSH_URL"
+else
+  echo "认证方式：SSH"
+fi
+
+if ! ssh -o BatchMode=yes -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+  echo "❌ SSH 认证失败。请先配置 GitHub SSH key，或改用 ssh://git@github.com/用户/仓库.git"
+  exit 1
+fi
+
+ORIGIN="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
+if [[ -n "$ORIGIN" ]]; then
+  if ! ORIGIN_SSH="$(normalize_ssh "$ORIGIN")"; then
+    echo "❌ 已有 origin 不是 GitHub 地址：$ORIGIN"
+    echo "不会修改现有远程。"
+    exit 1
+  fi
+  if [[ "$ORIGIN_SSH" != "$SSH_URL" ]]; then
+    echo "❌ 已有 origin 指向别的仓库：$ORIGIN"
+    echo "不会修改现有远程。请确认目标仓库。"
+    exit 1
+  fi
+  if [[ "$ORIGIN" == https://* ]]; then
+    git -C "$ROOT" remote set-url origin "$SSH_URL"
+    echo "已把同一个仓库的 origin 从 HTTPS 改为 SSH。"
+  fi
+else
+  git -C "$ROOT" remote add origin "$SSH_URL"
+  echo "已添加 origin。"
+fi
+
+if ! git -C "$ROOT" rev-parse --verify HEAD >/dev/null 2>&1; then
+  echo "❌ 本地还没有提交。先提交要上传的内容，脚本不会自动 git add。"
+  exit 1
+fi
+
+echo "正在检查远端分支..."
+if ! LS_REMOTE="$(git ls-remote "$SSH_URL" "refs/heads/$BRANCH" 2>&1)"; then
+  echo "❌ 远端仓库不存在，或当前 SSH 账号没有权限。"
+  echo "$LS_REMOTE"
+  exit 1
+fi
+
+if [[ -z "$LS_REMOTE" ]]; then
+  echo "✅ 可直接推送"
+  if [[ "$BRANCH" == "main" ]]; then
+    echo "推到哪个分支：main（远端还没有这个分支）"
+  else
+    echo "推到哪个分支：$BRANCH（远端还没有这个分支）"
+  fi
+  git -C "$ROOT" push -u origin "$BRANCH"
+  exit $?
+fi
+
+git -C "$ROOT" fetch origin "$BRANCH"
+
+AHEAD_BEHIND="$(git -C "$ROOT" rev-list --left-right --count "HEAD...origin/$BRANCH")"
+LOCAL_ONLY="${AHEAD_BEHIND%%[[:space:]]*}"
+REMOTE_ONLY="${AHEAD_BEHIND##*[[:space:]]}"
+
+if [[ "$REMOTE_ONLY" == "0" ]]; then
+  echo "✅ 可直接推送"
+  echo "推到哪个分支：$BRANCH（远端可快进）"
+  git -C "$ROOT" push -u origin "$BRANCH"
+  exit $?
+fi
+
+NEW_BRANCH="upload-$(date +%Y%m%d-%H%M%S)"
+echo "⚠️ 远端已有分叉，建议推新分支"
+echo "推到哪个分支：$NEW_BRANCH（保留 origin/$BRANCH，不覆盖）"
+git -C "$ROOT" push -u origin "HEAD:refs/heads/$NEW_BRANCH"
+exit $?
