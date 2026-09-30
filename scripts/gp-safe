@@ -113,7 +113,7 @@ if [[ -z "$LS_REMOTE" ]]; then
   if [[ "$BRANCH" == "main" ]]; then
     echo "推到哪个分支：main（远端还没有这个分支）"
   else
-    echo "推到哪个分支：$BRANCH（远端还没有这个分支）"
+    echo "推到哪个分支：${BRANCH}（远端还没有这个分支）"
   fi
   git -C "$ROOT" push -u origin "$BRANCH"
   exit $?
@@ -127,13 +127,13 @@ REMOTE_ONLY="${AHEAD_BEHIND##*[[:space:]]}"
 
 if [[ "$REMOTE_ONLY" == "0" ]]; then
   echo "✅ 可直接推送"
-  echo "推到哪个分支：$BRANCH（远端可快进）"
+  echo "推到哪个分支：${BRANCH}（远端可快进）"
   git -C "$ROOT" push -u origin "$BRANCH"
   exit $?
 fi
 
 NEW_BRANCH="upload-$(date +%Y%m%d-%H%M%S)"
 echo "⚠️ 远端已有分叉，建议推新分支"
-echo "推到哪个分支：$NEW_BRANCH（保留 origin/$BRANCH，不覆盖）"
+echo "推到哪个分支：${NEW_BRANCH}（保留 origin/${BRANCH}，不覆盖）"
 git -C "$ROOT" push -u origin "HEAD:refs/heads/$NEW_BRANCH"
 exit $?
