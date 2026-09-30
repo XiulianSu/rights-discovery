@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { OppStatus } from '../lib/types'
+import { STATUS_LABEL, type OppStatus } from '../lib/types'
 
 export function Icon({
   name,
@@ -147,7 +147,7 @@ export function Icon({
 }
 
 export function Badge({ status }: { status: OppStatus }) {
-  return <span className={`badge badge-${status}`}>{status === 'possible' ? '可能符合' : status === 'need_verify' ? '需核实' : '明显不符合'}</span>
+  return <span className={`badge badge-${status}`}>{STATUS_LABEL[status]}</span>
 }
 
 export function Choice({

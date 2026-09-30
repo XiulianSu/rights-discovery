@@ -1,4 +1,8 @@
 import type { GuideId, Profile } from './types'
+import { POLICY_RELEASE, moneyLabel } from './policyRelease'
+
+const DEDUCTION = moneyLabel(POLICY_RELEASE.rules.tax_rent.deductionMonthly)
+const CAP = moneyLabel(POLICY_RELEASE.rules.pf_rent.monthlyCap)
 
 export interface GuideSource {
   name: string
@@ -47,7 +51,7 @@ export const GUIDES: PolicyGuide[] = [
       '连续缴存还没满三个月',
       '本人或配偶在沪有自有住房',
       '已经办理过租房提取，或存在其他生效中的提取',
-      '账户余额未知时，不要把「每户月限额 4,000 元」写成可领总额',
+      `账户余额未知时，不要把「每户月限额 ${CAP} 元」写成可领总额`,
       '材料对不上当前办事指南分支，或规则已过期待复核',
     ],
     sources: [
@@ -61,7 +65,7 @@ export const GUIDES: PolicyGuide[] = [
         name: '市公积金管委会《关于优化本市住房公积金租赁提取业务相关事项的通知》',
         kind: 'gov',
         url: 'https://service.shanghai.gov.cn/XingZhengWenDangKuJyhTest/XZGFDetails.aspx?docid=241015151102JbADRZpu6KkOIFz6TBv',
-        note: '一般市场租赁每户月限额等口径的官方来源',
+        note: `一般市场租赁每户月限额 ${CAP} 元，以这份通知的施行日期和分支为准`,
       },
       {
         name: '「上海租房公积金 满三个月才能提」类笔记',
@@ -93,7 +97,7 @@ export const GUIDES: PolicyGuide[] = [
     name: '住房租金专项附加扣除',
     cover: 'tax',
     intro:
-      '在主要工作地为上海、实际租房且符合条件时，可以按每月 1,500 元减少应纳税所得额。这是税前扣除额，不是退税 1,500 元，更不是现金补贴。它和住房贷款利息扣除互斥，也和公积金提取互不相关，不能加总。',
+      `在主要工作地为上海、实际租房且符合条件时，可以按每月 ${DEDUCTION} 元减少应纳税所得额。这是税前扣除额，不是退税 ${DEDUCTION} 元，更不是现金补贴。它和住房贷款利息扣除互斥，也和公积金提取互不相关，不能加总。`,
     yesTitle: '什么情况下，通常可以去个税 App 填报',
     yesPoints: [
       '主要工作城市在上海，并且实际租住住房',
@@ -107,7 +111,7 @@ export const GUIDES: PolicyGuide[] = [
       '本人或配偶在主要工作城市有自有住房',
       '已经选择了房贷利息扣除（二者互斥）',
       '已经在个税 App 填报过租金扣除',
-      '把 12 个月 × 1,500 元当成能退 18,000 元',
+      `把 12 个月 × ${DEDUCTION} 元当成能退的现金`,
       '工资预扣环节已经享受时，年度汇算不一定再有退税',
     ],
     sources: [
@@ -115,7 +119,7 @@ export const GUIDES: PolicyGuide[] = [
         name: '上海市税务局《住房租金专项附加扣除热点问答》',
         kind: 'gov',
         url: 'https://shanghai.chinatax.gov.cn/zcfw/rdwd/202603/t479656.html',
-        note: '上海每月 1,500 元税前扣除额的官方口径',
+        note: `上海每月 ${DEDUCTION} 元税前扣除额的官方口径`,
       },
       {
         name: '国家税务总局《个人所得税综合所得汇算清缴管理办法》',

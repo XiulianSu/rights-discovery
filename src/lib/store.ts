@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { ActionState, AppState, ConsentLog, FeedbackItem, GuideId, OppId, Profile } from './types'
+import type { ActionRecord, ActionState, AppState, ConsentLog, FeedbackItem, GuideId, OppId, Profile } from './types'
 import { emptyAction, emptyAlarm, emptyProfile } from './types'
 
 const KEY = 'rights-discovery-mvp-20260927'
@@ -31,18 +31,41 @@ function appendConsentLog(logs: ConsentLog[], at: string): ConsentLog[] {
   return [...logs, { at, label: '已同意用途说明' }]
 }
 
+function migrateActionState(state: string | undefined): ActionState {
+  if (state === 'applied') return 'applied'
+  if (state === 'received' || state === 'completed') return 'completed'
+  if (state === 'ineligible' || state === 'rejected') return 'rejected'
+  if (state === 'already_claimed') return 'already_claimed'
+  return 'not_started'
+}
+
+function migrateAction(raw: Partial<ActionRecord> | undefined): ActionRecord {
+  const base = emptyAction()
+  return {
+    ...base,
+    ...raw,
+    state: migrateActionState(raw?.state),
+    logs: (raw?.logs ?? []).map((log) => ({ ...log, state: migrateActionState(log.state) })),
+  }
+}
+
+function browserStorage() {
+  if (typeof window === 'undefined') return null
+  return window.localStorage
+}
+
 function load(): AppState {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = browserStorage()?.getItem(KEY)
     if (!raw) return seed()
     const parsed = JSON.parse(raw) as AppState
     return {
       ...seed(),
       ...parsed,
-      profile: { ...emptyProfile(), ...parsed.profile },
+      profile: { ...emptyProfile(), ...parsed.profile, confirmedAt: { ...parsed.profile?.confirmedAt } },
       actions: {
-        tax_rent: { ...emptyAction(), ...parsed.actions?.tax_rent },
-        pf_rent: { ...emptyAction(), ...parsed.actions?.pf_rent },
+        tax_rent: migrateAction(parsed.actions?.tax_rent),
+        pf_rent: migrateAction(parsed.actions?.pf_rent),
       },
       alarms: {
         tax_rent: { ...emptyAlarm(), ...parsed.alarms?.tax_rent },
@@ -60,7 +83,7 @@ let state = load()
 const listeners = new Set<() => void>()
 
 function emit() {
-  localStorage.setItem(KEY, JSON.stringify(state))
+  browserStorage()?.setItem(KEY, JSON.stringify(state))
   listeners.forEach((l) => l())
 }
 
@@ -77,12 +100,21 @@ export function useApp() {
   return useSyncExternalStore(subscribe, getState, getState)
 }
 
+const STAMP_SKIP = new Set(['confirmedAt', 'consent', 'consentAt', 'payslip'])
+
 export function patchProfile(partial: Partial<Profile>) {
   const profile = { ...state.profile, ...partial }
   const consentAt = partial.consent === true ? partial.consentAt || profile.consentAt || new Date().toISOString() : profile.consentAt
+  const confirmedAt = { ...state.profile.confirmedAt, ...partial.confirmedAt }
+  if (!partial.confirmedAt) {
+    const now = new Date().toISOString()
+    for (const key of Object.keys(partial)) {
+      if (!STAMP_SKIP.has(key)) confirmedAt[key] = now
+    }
+  }
   state = {
     ...state,
-    profile: { ...profile, consentAt },
+    profile: { ...profile, consentAt, confirmedAt },
     consentLogs: partial.consent === true ? appendConsentLog(state.consentLogs, consentAt) : state.consentLogs,
   }
   emit()
@@ -118,7 +150,7 @@ export function patchAction(id: OppId, partial: { note?: string; remind?: boolea
 
 export function resetAll() {
   state = seed()
-  localStorage.removeItem(KEY)
+  browserStorage()?.removeItem(KEY)
   emit()
 }
 
@@ -170,6 +202,8 @@ export const DEMOS: Record<string, { label: string; hint: string; profile: Profi
       pfContinuous3Months: 'yes',
       leaseType: 'market',
       alreadyExtracted: 'no',
+      pfContributionCity: 'shanghai',
+      otherActiveExtraction: 'no',
       monthlySalary: '22000',
       prepaidTax: '800',
       monthlyRent: '6500',
@@ -194,6 +228,8 @@ export const DEMOS: Record<string, { label: string; hint: string; profile: Profi
       pfContinuous3Months: 'yes',
       leaseType: 'market',
       alreadyExtracted: 'no',
+      pfContributionCity: 'shanghai',
+      otherActiveExtraction: 'no',
       consent: true,
       consentAt: '2026-09-27T10:00:00.000Z',
     },
@@ -215,6 +251,8 @@ export const DEMOS: Record<string, { label: string; hint: string; profile: Profi
       pfContinuous3Months: 'yes',
       leaseType: 'market',
       alreadyExtracted: 'no',
+      pfContributionCity: 'shanghai',
+      otherActiveExtraction: 'no',
       consent: true,
       consentAt: '2026-09-27T10:00:00.000Z',
     },
@@ -235,6 +273,8 @@ export const DEMOS: Record<string, { label: string; hint: string; profile: Profi
       pfContinuous3Months: 'yes',
       leaseType: 'market',
       alreadyExtracted: 'no',
+      pfContributionCity: 'shanghai',
+      otherActiveExtraction: 'no',
       pfBalance: '42000',
       consent: true,
       consentAt: '2026-09-27T10:00:00.000Z',
@@ -256,6 +296,8 @@ export const DEMOS: Record<string, { label: string; hint: string; profile: Profi
       pfContinuous3Months: 'no',
       leaseType: 'market',
       alreadyExtracted: 'no',
+      pfContributionCity: 'shanghai',
+      otherActiveExtraction: 'no',
       monthlySalary: '18000',
       prepaidTax: '500',
       consent: true,

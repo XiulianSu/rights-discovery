@@ -1,3 +1,5 @@
+import { POLICY_RELEASE, policyActive, type PolicyRelease } from './policyRelease'
+
 export interface PolicyRule {
   id: string
   title: string
@@ -7,66 +9,85 @@ export interface PolicyRule {
   effectiveTo: string
   reviewedAt: string
   reviewer: string
+  releaseId: string
   sourceUrl: string
   sourceLabel: string
   notes: string
+  taxYearFrom?: string
+  taxYearTo?: string
 }
 
-export const TODAY = '2026-09-27'
-
-export const POLICIES: Record<string, PolicyRule> = {
-  'TAX-SH-RENT-2026.03': {
-    id: 'TAX-SH-RENT-2026.03',
-    title: '住房租金专项附加扣除',
-    jurisdiction: '全国框架 / 上海适用标准',
-    audience: '在上海主要工作且租住住房的居民个人',
-    effectiveFrom: '2026-01-01',
-    effectiveTo: '2026-12-31',
-    reviewedAt: '2026-09-27',
-    reviewer: '政策研究（初稿）',
-    sourceUrl: 'https://shanghai.chinatax.gov.cn/zcfw/rdwd/202603/t479656.html',
-    sourceLabel: '上海市税务局《住房租金专项附加扣除热点问答》',
-    notes: '上海标准为每月 1500 元税前扣除额。与住房贷款利息扣除互斥。扣除额不是退税额。',
-  },
-  'PF-SH-MARKET-2024.10': {
-    id: 'PF-SH-MARKET-2024.10',
-    title: '市场租赁住房公积金提取',
-    jurisdiction: '上海市',
-    audience: '在上海缴存住房公积金并租赁市场住房的缴存人',
-    effectiveFrom: '2024-10-01',
-    effectiveTo: '2027-12-31',
-    reviewedAt: '2026-09-27',
-    reviewer: '政策研究（初稿）',
-    sourceUrl:
-      'https://zwdt.sh.gov.cn/govPortals/bsfw/item/d2f5ed71-c4a7-4b67-b627-1381279130c2',
-    sourceLabel: '上海一网通办 · 市场租赁住房公积金提取办事指南',
-    notes: '一般市场租赁每户月限额 4000 元。可提取额来自本人账户余额，不是财政补贴。',
-  },
+export function systemAsOf(now = new Date()) {
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
+
+export function rulesFromRelease(release: PolicyRelease = POLICY_RELEASE): Record<string, PolicyRule> {
+  const tax = release.rules.tax_rent
+  const fund = release.rules.pf_rent
+  return {
+    [tax.id]: {
+      id: tax.id,
+      title: tax.title,
+      jurisdiction: tax.jurisdiction,
+      audience: tax.audience,
+      effectiveFrom: tax.policy.from ?? '',
+      effectiveTo: tax.policy.to ?? '',
+      reviewedAt: release.reviewedAt,
+      reviewer: release.reviewer,
+      releaseId: release.releaseId,
+      sourceUrl: tax.sourceUrl,
+      sourceLabel: tax.sourceLabel,
+      taxYearFrom: tax.taxYear.from ?? undefined,
+      taxYearTo: tax.taxYear.to ?? undefined,
+      notes: `上海标准为每月 ${tax.deductionMonthly} 元税前扣除额。与住房贷款利息扣除互斥。扣除额不是退税额。估算纳税年度与政策失效日不是同一条时间轴。`,
+    },
+    [fund.id]: {
+      id: fund.id,
+      title: fund.title,
+      jurisdiction: fund.jurisdiction,
+      audience: fund.audience,
+      effectiveFrom: fund.policy.from ?? '',
+      effectiveTo: fund.policy.to ?? '',
+      reviewedAt: release.reviewedAt,
+      reviewer: release.reviewer,
+      releaseId: release.releaseId,
+      sourceUrl: fund.sourceUrl,
+      sourceLabel: fund.sourceLabel,
+      notes: `一般市场租赁每户月限额 ${fund.monthlyCap} 元，自 ${fund.policy.from} 施行，有效期至 ${fund.policy.to}。${fund.branchNote}可提取额来自本人账户余额，不是财政补贴。`,
+    },
+  }
+}
+
+export const POLICIES = rulesFromRelease()
 
 export const OFFICIAL = {
   taxApp: {
-    label: '打开个人所得税 App / 电子税务局',
+    label: '个人所得税 App / 电子税务局',
     url: 'https://etax.chinatax.gov.cn/',
   },
   pfGuide: {
     label: '上海一网通办 · 租赁提取办事指南',
-    url: 'https://zwdt.sh.gov.cn/govPortals/bsfw/item/d2f5ed71-c4a7-4b67-b627-1381279130c2',
+    url: POLICY_RELEASE.rules.pf_rent.sourceUrl,
   },
   pfNotice: {
-    label: '市公积金管委会租赁提取通知',
-    url: 'https://service.shanghai.gov.cn/XingZhengWenDangKuJyhTest/XZGFDetails.aspx?docid=241015151102JbADRZpu6KkOIFz6TBv',
+    label: POLICY_RELEASE.rules.pf_rent.noticeLabel,
+    url: POLICY_RELEASE.rules.pf_rent.noticeUrl,
   },
 }
 
-export function isRuleActive(rule: PolicyRule, today = TODAY) {
-  return today >= rule.effectiveFrom && today <= rule.effectiveTo
+export function isRuleActive(ruleId: 'tax_rent' | 'pf_rent', asOf = systemAsOf(), release: PolicyRelease = POLICY_RELEASE) {
+  const rule = release.rules[ruleId]
+  return policyActive(rule.policy, asOf, rule.reviewStatus)
 }
 
-export function taxYearHint(today = TODAY) {
-  const [, month] = today.split('-').map(Number)
+export function taxYearHint(asOf = systemAsOf(), release: PolicyRelease = POLICY_RELEASE) {
+  const [, month] = asOf.split('-').map(Number)
+  const year = release.taxYear
   if (month >= 3 && month <= 6) {
     return '当前可能处于上一年度综合所得汇算清缴窗口。是否仍开放、能否补报，一律以个人所得税 App 和税务机关实时信息为准。本产品不代办、不承诺退税。'
   }
-  return '2026 纳税年度仍在进行中。住房租金扣除可在个人所得税 App 填报，可能从后续预扣起享受。若工资预扣环节已经享受，年度汇算时不一定再有退税。汇算开放时间以税务机关为准。'
+  return `${year} 纳税年度仍在进行中。住房租金扣除可在个人所得税 App 填报，可能从后续预扣起享受。若工资预扣环节已经享受，年度汇算时不一定再有退税。汇算开放时间以税务机关为准。`
 }

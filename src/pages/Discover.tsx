@@ -1,4 +1,4 @@
-import { Icon } from '../components/ui'
+import { Badge, Icon } from '../components/ui'
 import { evaluate, nextUnknown, taxYearHint } from '../lib/evaluate'
 import { POLICIES } from '../lib/policies'
 import { navigate } from '../lib/router'
@@ -6,8 +6,8 @@ import { useApp } from '../lib/store'
 import type { Opportunity } from '../lib/types'
 
 export function Discover() {
-  const { profile } = useApp()
-  const opps = evaluate(profile)
+  const { profile, actions } = useApp()
+  const opps = evaluate({ profile, actions })
   const follow = nextUnknown(profile)
 
   return (
@@ -41,34 +41,49 @@ export function Discover() {
 
 function headline(opp: Opportunity) {
   const a = opp.amount
-  if (opp.id === 'tax_rent') {
+  if (opp.status === 'possible' && a.personalEstimate) {
     if (a.taxSavingLow != null && a.taxSavingHigh != null) {
       const low = a.taxSavingLow.toLocaleString('zh-CN')
       const high = a.taxSavingHigh.toLocaleString('zh-CN')
       return low === high ? `少缴 ${low} 元` : `少缴 ${low}–${high} 元`
     }
-    return '无法估算少缴金额'
+    if (a.fundUpper != null) return `可提取 ${a.fundUpper.toLocaleString('zh-CN')} 元`
   }
-  if (a.fundUpper != null) return `可提取 ${a.fundUpper.toLocaleString('zh-CN')} 元`
-  return '无法估算可提取金额'
+  if (opp.status === 'possible') return '条件已确认，这次不展示个人金额'
+  if (opp.status === 'claimed') return '已处理，不再估算新增金额'
+  if (opp.status === 'policy_unverified') return '政策需复核，已停止金额建议'
+  if (opp.status === 'ineligible') return opp.summary
+  return opp.missingFacts[0]?.title ?? '还有事实需要确认'
 }
 
 function OpportunityCard({ opp }: { opp: Opportunity }) {
-  const missing = opp.conditions.filter((c) => c.status !== 'met').length
   const rule = POLICIES[opp.ruleId]
+  const action = opp.nextAction
 
   return (
-    <button
-      type="button"
-      className={`opp-card is-${opp.status}`}
-      onClick={() => navigate(`/opportunity/${opp.id}`)}
-    >
+    <article className={`opp-card is-${opp.status}`}>
       <p className="kicker">{opp.subtitle}</p>
+      <Badge status={opp.status} />
       <strong className="opp-title">{headline(opp)}</strong>
+      <p className="opp-summary">{opp.summary}</p>
       <div className="opp-foot">
-        <span>{missing ? `${missing} 项待核实或不满足` : '关键条件已确认'}</span>
-        <span>依据 {rule?.reviewedAt}</span>
+        <span>{opp.releaseId}</span>
+        <span>复核 {rule?.reviewedAt}</span>
       </div>
-    </button>
+      <div className="card-actions">
+        {action.href ? (
+          <a href={action.href} target="_blank" rel="noreferrer">
+            {action.label}
+          </a>
+        ) : (
+          <button type="button" className="btn btn-primary" onClick={() => action.path && navigate(action.path)}>
+            {action.label}
+          </button>
+        )}
+        <button type="button" className="btn btn-outline" onClick={() => navigate(`/opportunity/${opp.id}`)}>
+          查看依据
+        </button>
+      </div>
+    </article>
   )
 }

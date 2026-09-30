@@ -3,9 +3,11 @@ export type WorkCity = 'shanghai' | 'other' | 'unknown'
 export type Marital = 'single' | 'married' | 'unknown'
 export type LeaseType = 'market' | 'public' | 'other' | 'unknown'
 export type OppId = 'tax_rent' | 'pf_rent'
-export type OppStatus = 'possible' | 'need_verify' | 'ineligible'
+export type EligibilityStatus = 'possible' | 'need_verify' | 'ineligible' | 'policy_unverified'
+export type OppStatus = EligibilityStatus | 'claimed'
 export type CondStatus = 'met' | 'unmet' | 'unknown'
-export type ActionState = 'none' | 'verified' | 'applied' | 'received' | 'ineligible'
+export type ActionState = 'not_started' | 'already_claimed' | 'applied' | 'completed' | 'rejected'
+export type AmountType = 'deduction_base' | 'estimated_tax_saving' | 'owned_fund_access' | 'none'
 
 export interface PayslipFile {
   name: string
@@ -16,6 +18,7 @@ export interface PayslipFile {
 export interface Profile {
   rentingInShanghai: Answer
   workCity: WorkCity
+  pfContributionCity: WorkCity
   leaseStart: string
   leaseEnd: string
   ownHousing: Answer
@@ -27,6 +30,7 @@ export interface Profile {
   pfContinuous3Months: Answer
   leaseType: LeaseType
   alreadyExtracted: Answer
+  otherActiveExtraction: Answer
   monthlySalary: string
   prepaidTax: string
   monthlyRent: string
@@ -34,10 +38,13 @@ export interface Profile {
   payslip: PayslipFile | null
   consent: boolean
   consentAt: string
+  confirmedAt: Record<string, string>
 }
 
 export interface Condition {
   id: string
+  field?: string
+  answer?: string
   label: string
   status: CondStatus
   detail: string
@@ -47,6 +54,9 @@ export interface Condition {
 
 export interface AmountView {
   kind: 'tax' | 'fund'
+  amountType: AmountType
+  personalEstimate: boolean
+  assumptions: string[]
   deductionMonthly?: number
   deductionPeriod?: number
   deductionTotal?: number
@@ -58,16 +68,36 @@ export interface AmountView {
   fundNote: string
 }
 
+export interface MissingFact {
+  key: string
+  title: string
+  path: string
+}
+
+export interface NextAction {
+  label: string
+  path?: string
+  href?: string
+}
+
 export interface Opportunity {
   id: OppId
   title: string
   subtitle: string
+  eligibilityStatus: EligibilityStatus
+  actionStatus: ActionState
   status: OppStatus
   statusLabel: string
   summary: string
   conditions: Condition[]
+  missingFacts: MissingFact[]
+  nextAction: NextAction
   amount: AmountView
   ruleId: string
+  ruleVersionId: string
+  releaseId: string
+  evaluatedAt: string
+  taxYear: number
   officialUrl: string
   officialLabel: string
   materials: string[]
@@ -116,23 +146,26 @@ export interface AppState {
 }
 
 export const ACTION_LABEL: Record<ActionState, string> = {
-  none: '尚未处理',
-  verified: '我去核实了',
-  applied: '已填报或申请',
-  received: '已到账',
-  ineligible: '不符合',
+  not_started: '尚未办理',
+  already_claimed: '已办理',
+  applied: '已申请',
+  completed: '已办结',
+  rejected: '确认不符合',
 }
 
 export const STATUS_LABEL: Record<OppStatus, string> = {
   possible: '可能符合',
-  need_verify: '需核实',
-  ineligible: '明显不符合',
+  need_verify: '还需确认',
+  ineligible: '明确不符',
+  policy_unverified: '政策需复核',
+  claimed: '已处理',
 }
 
 export function emptyProfile(): Profile {
   return {
     rentingInShanghai: 'unknown',
     workCity: 'unknown',
+    pfContributionCity: 'unknown',
     leaseStart: '',
     leaseEnd: '',
     ownHousing: 'unknown',
@@ -144,6 +177,7 @@ export function emptyProfile(): Profile {
     pfContinuous3Months: 'unknown',
     leaseType: 'unknown',
     alreadyExtracted: 'unknown',
+    otherActiveExtraction: 'unknown',
     monthlySalary: '',
     prepaidTax: '',
     monthlyRent: '',
@@ -151,11 +185,12 @@ export function emptyProfile(): Profile {
     payslip: null,
     consent: false,
     consentAt: '',
+    confirmedAt: {},
   }
 }
 
 export function emptyAction(): ActionRecord {
-  return { state: 'none', note: '', remind: false, logs: [] }
+  return { state: 'not_started', note: '', remind: false, logs: [] }
 }
 
 export function emptyAlarm(): PolicyAlarm {

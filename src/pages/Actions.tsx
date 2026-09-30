@@ -4,11 +4,11 @@ import { navigate } from '../lib/router'
 import { patchAction, setAction, useApp } from '../lib/store'
 import { ACTION_LABEL, type ActionState, type OppId } from '../lib/types'
 
-const STATES: ActionState[] = ['verified', 'applied', 'received', 'ineligible']
+const STATES: ActionState[] = ['not_started', 'already_claimed', 'applied', 'completed', 'rejected']
 
 export function Actions() {
   const app = useApp()
-  const opps = evaluate(app.profile)
+  const opps = evaluate({ profile: app.profile, actions: app.actions })
 
   return (
     <div className="page">

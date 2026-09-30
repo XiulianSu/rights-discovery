@@ -6,6 +6,7 @@ import type { Profile } from '../lib/types'
 
 const LABELS: { key: keyof Profile; label: string }[] = [
   { key: 'workCity', label: '主要工作城市' },
+  { key: 'pfContributionCity', label: '公积金缴存城市' },
   { key: 'leaseStart', label: '起租月份' },
   { key: 'leaseEnd', label: '结束月份' },
   { key: 'ownHousing', label: '本人自有住房' },
@@ -17,6 +18,7 @@ const LABELS: { key: keyof Profile; label: string }[] = [
   { key: 'pfContinuous3Months', label: '连续缴存满三个月' },
   { key: 'leaseType', label: '租赁类型' },
   { key: 'alreadyExtracted', label: '已办理租房提取' },
+  { key: 'otherActiveExtraction', label: '其他生效提取' },
   { key: 'monthlySalary', label: '当月税前工资' },
   { key: 'prepaidTax', label: '当月已预缴个税' },
   { key: 'monthlyRent', label: '每月租金' },
@@ -101,11 +103,17 @@ export function Docs() {
 
         <section className="block">
           <h4>已提供信息</h4>
+          <p className="tiny">这些资料只在本机浏览器里。清理站点数据或更换设备后会丢失，也不会同步到服务器。</p>
           <ul className="kv">
             {LABELS.map((row) => (
               <li key={row.key}>
                 <span>{row.label}</span>
-                <b>{display(row.key, profile[row.key])}</b>
+                <b>
+                  {display(row.key, profile[row.key])}
+                  {profile.confirmedAt?.[row.key] ? (
+                    <small> {new Date(profile.confirmedAt[row.key]).toLocaleString('zh-CN')}</small>
+                  ) : null}
+                </b>
               </li>
             ))}
           </ul>

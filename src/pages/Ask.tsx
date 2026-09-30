@@ -13,7 +13,8 @@ type Q = {
 }
 
 const QUESTIONS: Q[] = [
-  { id: 'workCity', title: '主要工作城市是？', desc: '住房租金扣除看主要工作地，不看户籍。本阶段按上海口径判断。', visible: () => true },
+  { id: 'workCity', title: '主要工作城市是？', desc: '住房租金扣除看主要工作地，不看户籍，也不等于公积金缴存城市。', visible: () => true },
+  { id: 'pfContributionCity', title: '住房公积金在哪个城市缴存？', desc: '市场租赁提取看缴存地。工作在上海、缴存在外地，不能直接套用上海提取口径。', visible: () => true },
   { id: 'lease', title: '这套房子大概从哪月租到哪月？', desc: '用来估算覆盖月份。不确定可以先跳过，结果会标成需核实。', visible: () => true },
   { id: 'ownHousing', title: '你本人在主要工作城市有自有住房吗？', desc: '有自有住房时，租金扣除和租房提取通常都不符合。', visible: () => true },
   { id: 'marital', title: '目前的婚姻状况？', desc: '配偶住房和申报情况会改变两项结论。', visible: () => true },
@@ -23,7 +24,8 @@ const QUESTIONS: Q[] = [
   { id: 'spouseClaimed', title: '配偶是否已申报住房租金或房贷利息扣除？', desc: '同一年度夫妻双方通常不能重复享受同类扣除。', visible: (p) => p.marital === 'married' },
   { id: 'pfContinuous3Months', title: '上海公积金是否已连续缴存满三个月？', desc: '未满三个月时，不能提示「现在可提取」。不确定请跳过。', visible: () => true },
   { id: 'leaseType', title: '租赁类型更接近哪一种？', desc: '市场租赁、公租房的材料和限额不同。选不准就跳过。', visible: () => true },
-  { id: 'alreadyExtracted', title: '是否已经办理过住房公积金租房提取？', desc: '已办理或存在其他生效提取业务时，不再提示现在可提取。', visible: () => true },
+  { id: 'alreadyExtracted', title: '是否已经办理过住房公积金租房提取？', desc: '已经办理过的，不再当成一笔新的可提取金额。', visible: () => true },
+  { id: 'otherActiveExtraction', title: '现在还有没有其他生效中的公积金提取？', desc: '例如还贷提取。这一项和「是否已办租房提取」分开回答。不清楚可以跳过。', visible: () => true },
   { id: 'money', title: '可选：补充数字，方便估算', desc: '都可以空着。没有已预缴税就不会给出精确少缴税额；没有公积金余额就不会写可领取总额。', visible: () => true },
 ]
 
@@ -80,6 +82,19 @@ export function Ask() {
 function QuestionBody({ id }: { id: string }) {
   const { profile } = useApp()
   const p = profile
+
+  if (id === 'pfContributionCity') {
+    return (
+      <div className="stack">
+        <Choice selected={p.pfContributionCity === 'shanghai'} onClick={() => patchProfile({ pfContributionCity: 'shanghai' })}>
+          在上海缴存
+        </Choice>
+        <Choice selected={p.pfContributionCity === 'other'} onClick={() => patchProfile({ pfContributionCity: 'other' })}>
+          在其他城市缴存
+        </Choice>
+      </div>
+    )
+  }
 
   if (id === 'workCity') {
     return (
@@ -180,6 +195,12 @@ function QuestionBody({ id }: { id: string }) {
     )
   }
 
+  if (id === 'otherActiveExtraction') {
+    return (
+      <YesNo value={p.otherActiveExtraction} onYes={() => patchProfile({ otherActiveExtraction: 'yes' })} onNo={() => patchProfile({ otherActiveExtraction: 'no' })} yes="还有其他生效提取" no="没有" />
+    )
+  }
+
   return <MoneyFields />
 }
 
@@ -239,7 +260,7 @@ export function PayslipField() {
 
   return (
     <div className="upload">
-      <p>可选上传工资单。演示只保留文件名，请你手工核对工资和预缴税；身份证号、银行卡号请先自行遮蔽。</p>
+      <p>选择文件名演示。这里只记下文件名，不会解析或保存工资单原件。工资和预缴税仍请你手工填写。</p>
       {profile.payslip ? (
         <div className="file-row">
           <span>{profile.payslip.name}</span>
@@ -249,7 +270,7 @@ export function PayslipField() {
         </div>
       ) : (
         <label className="file-btn">
-          选择图片或 PDF
+          选择文件名演示
           <input
             type="file"
             accept="image/*,.pdf"

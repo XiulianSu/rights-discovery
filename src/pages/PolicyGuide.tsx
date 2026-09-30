@@ -33,7 +33,7 @@ export function PolicyGuide() {
 
   async function enableAlarm() {
     setAlarm(current.id, days, true)
-    setAlarmMsg(`已记下 ${days} 天后提醒。浏览器不能保证锁屏闹钟，建议同时在系统闹钟里设一次。`)
+    setAlarmMsg(`已记下 ${days} 天后提醒。这只是设置时的确认，到点不会由服务器叫醒你，浏览器也不能保证锁屏闹钟。`)
     try {
       if ('Notification' in window && Notification.permission === 'default') {
         await Notification.requestPermission()
@@ -68,7 +68,7 @@ export function PolicyGuide() {
       </section>
 
       <section className="guide-reviews">
-        <h3>真实评价</h3>
+        <h3>适用要点与常见误解</h3>
         <article className="quote-card is-yes">
           <p className="quote-kicker">{guide.yesTitle}</p>
           <ol>

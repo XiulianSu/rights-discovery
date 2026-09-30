@@ -17,7 +17,7 @@ export function Gate() {
         <div className="stack">
           <Choice
             selected={profile.rentingInShanghai === 'yes'}
-            onClick={() => patchProfile({ rentingInShanghai: 'yes', workCity: profile.workCity === 'unknown' ? 'shanghai' : profile.workCity })}
+            onClick={() => patchProfile({ rentingInShanghai: 'yes' })}
           >
             是，我在上海租房
           </Choice>

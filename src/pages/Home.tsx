@@ -87,6 +87,7 @@ export function Home() {
                 type="button"
                 className="demo-item"
                 onClick={() => {
+                  if (!confirm('演示样本会替换本机已经填写的资料。继续吗？')) return
                   applyProfile(demo.profile)
                   navigate('/discover')
                 }}

@@ -210,6 +210,10 @@ a { color: var(--blue); text-decoration: none; }
 .badge-possible { background: var(--ok-soft); color: var(--ok); }
 .badge-need_verify { background: var(--warn-soft); color: var(--warn); }
 .badge-ineligible { background: var(--bad-soft); color: var(--bad); }
+.badge-policy_unverified, .badge-claimed { background: #f2f4f7; color: #344054; }
+.opp-card.is-claimed, .opp-card.is-policy_unverified { border-color: #d0d5dd; }
+.opp-card .card-actions { display: flex; gap: 8px; margin-top: 12px; }
+.opp-card .card-actions a, .opp-card .card-actions button { border-radius: 12px; padding: 8px 10px; font-size: 13px; font-weight: 600; }
 
 .follow-card {
   width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center;

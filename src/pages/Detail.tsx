@@ -9,8 +9,8 @@ import type { OppId, Opportunity } from '../lib/types'
 export function Detail() {
   const { path } = parsePath(usePath())
   const id = (path.split('/').pop() || 'tax_rent') as OppId
-  const { profile } = useApp()
-  const opp = evaluateOne(profile, id === 'pf_rent' ? 'pf_rent' : 'tax_rent')
+  const { profile, actions } = useApp()
+  const opp = evaluateOne({ profile, actions }, id === 'pf_rent' ? 'pf_rent' : 'tax_rent')
   const rule = POLICIES[opp.ruleId]
 
   return (
@@ -63,7 +63,11 @@ export function Detail() {
           <p className="body">
             {rule.title} · {rule.id}
             <br />
-            适用 {rule.jurisdiction} · {rule.effectiveFrom} 至 {rule.effectiveTo}
+            发布 {opp.releaseId} · 本次估算纳税年度 {opp.taxYear}
+            <br />
+            政策施行 {rule.effectiveFrom || '本次复核未设起点'}
+            {rule.effectiveTo ? ` 至 ${rule.effectiveTo}` : '（本次复核未设失效日）'}
+            {rule.taxYearFrom ? ` · 纳税年度 ${rule.taxYearFrom} 至 ${rule.taxYearTo}` : ''}
             <br />
             复核 {rule.reviewedAt} · {rule.reviewer}
           </p>
@@ -73,11 +77,18 @@ export function Detail() {
           </a>
         </section>
 
-        <a className="official primary" href={opp.officialUrl} target="_blank" rel="noreferrer">
+        {opp.nextAction.href ? (
+          <a className="official primary" href={opp.nextAction.href} target="_blank" rel="noreferrer">
+            <Icon name="link" size={16} />
+            {opp.nextAction.label}
+          </a>
+        ) : (
+          <PrimaryBtn onClick={() => opp.nextAction.path && navigate(opp.nextAction.path)}>{opp.nextAction.label}</PrimaryBtn>
+        )}
+        <a className="official" href={opp.officialUrl} target="_blank" rel="noreferrer">
           <Icon name="link" size={16} />
           {opp.officialLabel}
         </a>
-        <PrimaryBtn onClick={() => navigate('/actions')}>去记录办理进度</PrimaryBtn>
         <p className="tiny">跳转官方入口后，本产品不会自动登录、代填或提交。</p>
       </div>
     </div>
@@ -94,11 +105,11 @@ function AmountMetrics({ opp }: { opp: Opportunity }) {
           <strong>{a.deductionMonthly ? `${a.deductionMonthly.toLocaleString('zh-CN')} 元/月` : '—'}</strong>
         </div>
         <div>
-          <span>可能少缴税额</span>
+          <span>{a.personalEstimate ? '估计少缴税额' : '个人少缴估算'}</span>
           <strong>
             {a.taxSavingLow != null && a.taxSavingHigh != null
               ? `${a.taxSavingLow.toLocaleString('zh-CN')}–${a.taxSavingHigh.toLocaleString('zh-CN')}`
-              : '无法估算'}
+              : '不展示'}
           </strong>
         </div>
       </div>
@@ -107,12 +118,12 @@ function AmountMetrics({ opp }: { opp: Opportunity }) {
   return (
     <div className="metrics">
       <div>
-        <span>月限额口径</span>
+        <span>政策一般月限额，不是个人估算</span>
         <strong>{a.fundMonthlyCap ? `${a.fundMonthlyCap.toLocaleString('zh-CN')} 元/户` : '需按分支核实'}</strong>
       </div>
       <div>
-        <span>可提取上界</span>
-        <strong>{a.fundUpper != null ? `${a.fundUpper.toLocaleString('zh-CN')} 元` : '无法估算'}</strong>
+        <span>{a.personalEstimate ? '本人账户可提取上界' : '个人可提取估算'}</span>
+        <strong>{a.fundUpper != null ? `${a.fundUpper.toLocaleString('zh-CN')} 元` : '不展示'}</strong>
       </div>
     </div>
   )
